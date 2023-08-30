@@ -1,16 +1,17 @@
 import socket
 import wave
+from queue import Queue
 
 
 class RTPReceiver:
-    def __init__(self, address, port, wav_output, raw_output):
+    def __init__(self, address, port, wav_output):
         self.address = address
         self.port = port
         self.wav_output = wav_output
-        self.raw_output = raw_output
         self.sock = None
         self.wav_file = None
         self.raw_file = None
+        self.samples_queue = Queue()
 
     def connect(self):
         """Bind a socket and start listening on the specified address and port."""
@@ -32,7 +33,7 @@ class RTPReceiver:
 
         return data[header_length:]
 
-    def receive(self, buffer_size=2048):
+    def receive(self, event, buffer_size=2048):
         """Receive RTP packets, extract audio payload and save to specified files."""
         # Initialize WAV file for saving
         self.wav_file = wave.open(self.wav_output, 'wb')
@@ -41,11 +42,18 @@ class RTPReceiver:
         self.wav_file.setframerate(16000)  # 16000Hz sampling rate
 
         try:
-            while True:
+            while event.is_set():
                 data, _ = self.sock.recvfrom(buffer_size)
                 payload = self._extract_rtp_payload(data)
                 self.wav_file.writeframes(payload)
-                yield payload
+                self.samples_queue.put(payload)
+
+                if len(payload) < 100:  # it's a kludge, but I don't know how to do it properly
+                    self.wav_file.close()
+                    self.sock.close()
+                    event.clear()
+                    break
+
         except KeyboardInterrupt:
             print("Receiver stopped.")
         finally:
