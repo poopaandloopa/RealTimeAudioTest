@@ -5,13 +5,12 @@ from threading import Thread, Event
 import time
 
 
-def generate_frames(event, queue):
+def generate_frames(event, mel_queue):
     """
     Dumb function to simulate generation process
     """
-    while event.is_set() or not queue.empty():
-        print(queue.qsize())
-        queue.get()
+    while event.is_set() or not mel_queue.empty():
+        mel_queue.get()
         time.sleep(1)
 
 
